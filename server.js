@@ -1,11 +1,8 @@
 require("dotenv").config();
+const { serveHTTP } = require("stremio-addon-sdk");
 const builder = require("./index");
 
 const port = process.env.PORT || 7000;
-const ip = process.env.IP || localhost;
+const ip = process.env.IP || "localhost";
 
-require("http")
-  .createServer(builder.getInterface())
-  .listen(port, ip, () => {
-    console.log(`✅ Addon running on ${ip}:${port}`);
-  });
+serveHTTP(builder.getInterface(), { port: port });
