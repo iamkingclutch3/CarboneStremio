@@ -46,7 +46,7 @@ async function refreshEpisodeMap() {
         continue;
       }
 
-      const { title, season, episode } = parsed;
+      const { title, season, episode, subtitle_language } = parsed;
 
       if (!title || !episode) continue;
 
@@ -60,6 +60,7 @@ async function refreshEpisodeMap() {
       newEpisodeMap[streamId] = {
         title: `${title} Ep${episode}`,
         url: file.url,
+        lang: subtitle_language,
       };
     } catch (err) {
       console.error("Failed to parse filename:", file.filename, err.message);
@@ -72,7 +73,11 @@ async function refreshEpisodeMap() {
 
   const jsonFilePath = path.join(__dirname, "episodeMap.json");
 
-  fs.writeFileSync(jsonFilePath, JSON.stringify(newEpisodeMap, null, 2), "utf-8");
+  fs.writeFileSync(
+    jsonFilePath,
+    JSON.stringify(newEpisodeMap, null, 2),
+    "utf-8"
+  );
   console.log(`💾 Episode map saved to ${jsonFilePath}`);
 
   console.log(
@@ -115,6 +120,7 @@ builder.defineStreamHandler(({ type, id }) => {
         {
           title: streamData.title,
           url: streamData.url,
+          language: streamData.lang,
         },
       ],
     });

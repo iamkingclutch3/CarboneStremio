@@ -42,6 +42,7 @@ async function parseFilename(filename) {
       title: data.title || null,
       episode: cleanEpisode,
       season: data.season || 1,
+      subtitle_language: data.subtitle_language || null,
     };
   } catch (err) {
     console.error("❌ Failed to parse filename via OpenSubtitles:", err);
