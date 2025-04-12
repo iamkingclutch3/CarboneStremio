@@ -123,11 +123,11 @@ builder.defineStreamHandler(({ type, id }) => {
   if (streamData && streamData.length > 0) {
     return Promise.resolve({
       streams: streamData.map((stream) => ({
-          title: streamData.title,
-          url: streamData.url,
-          description: streamData.lang,
-    })),
-  });
+        title: stream.title,
+        url: stream.url,
+        description: stream.lang,
+      })),
+    });
   }
 
   return Promise.resolve({ streams: [] });
