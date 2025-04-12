@@ -120,7 +120,7 @@ builder.defineStreamHandler(({ type, id }) => {
         {
           title: streamData.title,
           url: streamData.url,
-          language: streamData.lang,
+          name: streamData.lang,
         },
       ],
     });
