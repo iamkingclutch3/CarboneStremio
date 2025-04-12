@@ -13,8 +13,8 @@ app.use("/", getRouter(builder.getInterface()));
 
 // Landing page
 app.get("/", (req, res) => {
-  const manifestUrl = `http://${req.hostname}:${port}/manifest.json`;
-  const stremioInstallUrl = `stremio://${req.hostname}:${port}/manifest.json`;
+  const manifestUrl = `http://${req.hostname}/manifest.json`;
+  const stremioInstallUrl = `stremio://${req.hostname}/manifest.json`;
 
   res.send(`
     <!DOCTYPE html>
