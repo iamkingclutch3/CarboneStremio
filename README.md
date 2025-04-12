@@ -1,3 +1,5 @@
 Uses RealDebrid together with Stremio [MAL Addon](https://mal-stremio.vercel.app/configure) to provide an easy way to watch your downloaded anime in Stremio and sync it with your MyAnimeList account.
 
 Requires a [RealDebrid](https://real-debrid.com/) api key and a [OpenSubtitles](https://www.opensubtitles.com/es) api key.
+
+Try it out [here](https://carbone.sytes.net/).
