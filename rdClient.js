@@ -12,10 +12,6 @@ async function getDownloads() {
       },
     });
 
-    response.data.forEach((entry) => {
-      console.log(entry.filename);
-    });
-
     // Only return completed files with names and links
     return response.data
       .filter((entry) => entry.filename && entry.download)

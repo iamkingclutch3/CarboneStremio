@@ -7,8 +7,8 @@ const path = require("path");
 
 const manifest = {
   id: "io.github.kingclutch23.carbone",
-  version: "1.0.0",
-  name: "Carbone",
+  version: "0.0.3",
+  name: process.env.DEV == "1" ? "Carbone Dev" : "Carbone",
   description: "Streams your RD-downloaded episodes",
   resources: ["stream"],
   types: ["movie", "series", "anime"],
@@ -46,7 +46,7 @@ async function refreshEpisodeMap() {
         continue;
       }
 
-      const { title, season, episode, subtitle_language } = parsed;
+      const { title, filename, season, episode, subtitle_language } = parsed;
 
       if (!title || !episode) continue;
 
@@ -63,8 +63,16 @@ async function refreshEpisodeMap() {
       }
 
       // Push the new stream into the array
+
+      // Check if the stream already exists to avoid duplicates
+      const existingStream = newEpisodeMap[streamId].find(
+        (stream) => stream.title == filename
+      );
+
+      if (existingStream) continue; // Skip if already exists
+
       newEpisodeMap[streamId].push({
-        title: `${title} Ep${episode}`,
+        title: filename || `${title} Ep${episode}`,
         url: file.url,
         lang: subtitle_language,
       });
@@ -120,12 +128,12 @@ builder.defineStreamHandler(({ type, id }) => {
   console.log(`Incoming stream request for ${id}`);
 
   const streamData = episodeMap[id];
+  console.log(streamData);
   if (streamData && streamData.length > 0) {
     return Promise.resolve({
       streams: streamData.map((stream) => ({
-        title: stream.title,
+        description: stream.title + "\n" + stream.lang,
         url: stream.url,
-        description: stream.lang,
       })),
     });
   }

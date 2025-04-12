@@ -13,8 +13,20 @@ app.use("/", getRouter(builder.getInterface()));
 
 // Landing page
 app.get("/", (req, res) => {
-  const manifestUrl = `http://${req.hostname}/manifest.json`;
-  const stremioInstallUrl = `stremio://${req.hostname}/manifest.json`;
+  const manifestUrl = `http://${req.hostname}${
+    req.hostname == "localhost" ||
+    req.hostname == "127.0.0.1" ||
+    req.hostname == "0.0.0.0"
+      ? `:${port}`
+      : ""
+  }/manifest.json`;
+  const stremioInstallUrl = `stremio://${req.hostname}${
+    req.hostname == "localhost" ||
+    req.hostname == "127.0.0.1" ||
+    req.hostname == "0.0.0.0"
+      ? `:${port}`
+      : ""
+  }/manifest.json`;
 
   res.send(`
     <!DOCTYPE html>
