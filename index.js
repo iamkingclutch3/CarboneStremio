@@ -57,11 +57,17 @@ async function refreshEpisodeMap() {
       }
 
       const streamId = `kitsu:${malId}:${episode}`;
-      newEpisodeMap[streamId] = {
+
+      if (!newEpisodeMap[streamId]) {
+        newEpisodeMap[streamId] = [];
+      }
+
+      // Push the new stream into the array
+      newEpisodeMap[streamId].push({
         title: `${title} Ep${episode}`,
         url: file.url,
         lang: subtitle_language,
-      };
+      });
     } catch (err) {
       console.error("Failed to parse filename:", file.filename, err.message);
     }
@@ -114,16 +120,14 @@ builder.defineStreamHandler(({ type, id }) => {
   console.log(`Incoming stream request for ${id}`);
 
   const streamData = episodeMap[id];
-  if (streamData) {
+  if (streamData && streamData.length > 0) {
     return Promise.resolve({
-      streams: [
-        {
+      streams: streamData.map((stream) => ({
           title: streamData.title,
           url: streamData.url,
-          name: streamData.lang,
-        },
-      ],
-    });
+          description: streamData.lang,
+    })),
+  });
   }
 
   return Promise.resolve({ streams: [] });
