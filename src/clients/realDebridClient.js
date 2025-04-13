@@ -1,10 +1,8 @@
-const axios = require("axios");
-const dotenv = require("dotenv").config();
+import axios from "axios";
 
 const RD_API = "https://api.real-debrid.com/rest/1.0";
-const RD_TOKEN = process.env.RD_TOKEN;
 
-async function getDownloads() {
+async function getDownloads(RD_TOKEN) {
   try {
     const response = await axios.get(`${RD_API}/downloads?limit=200`, {
       headers: {
@@ -25,6 +23,4 @@ async function getDownloads() {
   }
 }
 
-module.exports = {
-  getDownloads,
-};
+export { getDownloads };

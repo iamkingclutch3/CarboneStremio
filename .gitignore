@@ -1,4 +1,4 @@
 .env
 episodeMap.json
 /node_modules
-rdtokens.json
+data/*

@@ -1,76 +1,133 @@
-const PQueue = require("p-queue");
-const fetch = (...args) =>
-  import("node-fetch").then((mod) => mod.default(...args));
-const cache = new Map();
+import { RateLimiter } from "limiter";
+import { LRUCache } from "lru-cache";
+import fetch from "node-fetch";
 
-const queue = new PQueue({
-  intervalCap: 5, // 5 requests per interval
-  interval: 1000, // 1 second
-  carryoverConcurrencyCount: true, // Carry over unfinished requests
+// More efficient cache with TTL
+const cache = new LRUCache({
+  max: 1000,
+  ttl: 60 * 60 * 1000, // 1 hour cache
+});
+
+// More accurate rate limiter
+const limiter = new RateLimiter({
+  tokensPerInterval: 5,
+  interval: 1000,
+  fireImmediately: true,
 });
 
 const OPEN_SUBTITLES_API_KEY = process.env.OPEN_SUBTITLES_TOKEN;
 
-// Helper to get a clean episode number
-function extractSingleEpisode(episodes) {
-  if (Array.isArray(episodes)) {
-    return episodes.length > 0 ? Math.min(...episodes) : null;
-  } else if (typeof episodes === "number") {
-    return episodes;
+// Pre-compiled regex for common patterns
+const COMMON_PATTERNS = {
+  episode: /(?:ep|episode|cap|ch|第)\s*(\d+)/i,
+  season: /(?:s|season|シーズン)\s*(\d+)/i,
+  title: /^(.*?)(?:\s*[-.]\s*[Ss]\d|$)/,
+  cleanSpecial: /[_\-.]/g,
+  spanish: /(?:capitulo|episodio)\s*(\d+)/i,
+  anime: /(?: - )(\d+)(?:v\d+)?(?: END)?\./i,
+};
+
+const PATTERN_VALIDATORS = {
+  english: (match, filename) =>
+    match && match[1] && filename.includes(`Ep${match[1]}`),
+
+  spanish: (match, filename) =>
+    match &&
+    match[1] &&
+    filename.toLowerCase().includes(`capitulo ${match[1]}`),
+
+  anime: (match, filename) =>
+    match && match[1] && filename.includes(` - ${match[1]}`),
+};
+
+function extractEpisode(episodes) {
+  return Array.isArray(episodes)
+    ? Math.min(...episodes)
+    : typeof episodes === "number"
+    ? episodes
+    : null;
+}
+
+function fastGuess(filename) {
+  // Try patterns in order of likelihood
+  const attempts = [
+    { type: "anime", regex: COMMON_PATTERNS.anime },
+    { type: "spanish", regex: COMMON_PATTERNS.spanish },
+    { type: "english", regex: COMMON_PATTERNS.episode },
+  ];
+
+  for (const { type, regex } of attempts) {
+    const match = filename.match(regex);
+    if (match && PATTERN_VALIDATORS[type](match, filename)) {
+      const seasonMatch = filename.match(COMMON_PATTERNS.season);
+      return {
+        episode: parseInt(match[1]),
+        season: seasonMatch ? parseInt(seasonMatch[1]) : 1,
+        title: filename
+          .match(COMMON_PATTERNS.title)[1]
+          .replace(COMMON_PATTERNS.cleanSpecial, " ")
+          .trim(),
+        _matchedBy: type, // For debugging
+      };
+    }
   }
   return null;
 }
 
-const fixFilename = (str) => {
-  return str.replace(/(Capitulo_)\d+-\((\d+)\)/, (_, prefix, epReal) => {
-    return `${prefix}${epReal}`;
-  });
-};
-
 async function parseFilename(filename) {
-  filename = fixFilename(filename);
-
+  // 1. Check cache first
   if (cache.has(filename)) {
     return cache.get(filename);
   }
 
-  return queue.add(async () => {
-    try {
-      const url = `https://api.opensubtitles.com/api/v1/utilities/guessit?filename=${encodeURIComponent(
-        filename
-      )}`;
+  // 2. Try fast local parsing
+  const quickResult = fastGuess(filename);
+  if (quickResult) {
+    cache.set(filename, quickResult);
+    return quickResult;
+  }
 
-      const res = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          "Api-Key": OPEN_SUBTITLES_API_KEY,
-          "User-Agent": "CarboneStremio/1.0",
-        },
-      });
+  // 3. Fallback to API with rate limiting
+  await limiter.removeTokens(1);
 
-      if (!res.ok) {
-        console.error("❌ OpenSubtitles API error:", res.status);
-        return null;
-      }
+  try {
+    const url = new URL(
+      "https://api.opensubtitles.com/api/v1/utilities/guessit"
+    );
+    url.searchParams.set("filename", filename);
 
-      const data = await res.json();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
-      // Ensure we only take ONE episode number
-      const cleanEpisode = extractSingleEpisode(data.episode);
-      return {
-        title: data.title || null,
-        filename: filename,
-        episode: cleanEpisode,
-        season: data.season || 1,
-        subtitle_language: data.subtitle_language || "",
-      };
-    } catch (err) {
-      console.error("❌ Failed to parse filename via OpenSubtitles:", err);
-      return null;
-    }
-  });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "User-Agent": "CarboneStremio/1.0",
+        "Accept-Encoding": "gzip", // Reduce bandwidth
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+    const data = await res.json();
+    const result = {
+      title: data.title || null,
+      filename,
+      episode: extractEpisode(data.episode),
+      season: data.season || 1,
+      subtitle_language: data.subtitle_language || "",
+    };
+
+    cache.set(filename, result);
+    return result;
+  } catch (err) {
+    console.error("Parse failed for:", filename, err.message);
+    // Cache failures briefly to avoid hammering API
+    cache.set(filename, null, 60 * 1000);
+    return null;
+  }
 }
 
-module.exports = {
-  parseFilename,
-};
+export { parseFilename };

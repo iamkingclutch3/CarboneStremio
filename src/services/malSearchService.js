@@ -1,4 +1,4 @@
-const axios = require("axios");
+import axios from "axios";
 
 async function searchKitsuId(title, season = null) {
   try {
@@ -42,6 +42,4 @@ async function searchKitsuId(title, season = null) {
   }
 }
 
-module.exports = {
-  searchKitsuId,
-};
+export { searchKitsuId };

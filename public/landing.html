@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Carbone Stremio Addon</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        padding: 50px;
+        background-color: #1e1e1e;
+        color: white;
+      }
+      .btn {
+        padding: 12px 24px;
+        background-color: #9147ff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 18px;
+        text-decoration: none;
+        margin-top: 20px;
+        display: inline-block;
+      }
+      .btn:hover {
+        background-color: #7e30ff;
+      }
+      #apiKeyInput {
+        padding: 10px;
+        width: 80%;
+        max-width: 200px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📺 Carbone Addon for Stremio</h1>
+    <p>
+      This addon lets you stream your Real-Debrid downloaded anime via Stremio.
+    </p>
+    <br />
+    <!-- <p>
+      <label for="apiKeyInput" style="margin-right: 10px"
+        >Real-Debrid API Key:</label
+      >
+      <input type="text" id="apiKeyInput" placeholder="Enter API Key" />
+      <a
+        href="https://real-debrid.com/apitoken"
+        target="_blank"
+        style="margin-left: 5px; font-size: xx-small; color: #9147ff"
+        >Get it here</a
+      >
+    </p> -->
+    <button class="btn" id="installButton">Install in Stremio</button>
+    <script>
+      document
+        .getElementById("installButton")
+        .addEventListener("click", function () {
+
+          window.location.href = "{{STREMIO_INSTALL_URL}}";
+
+          /*
+          const apiKey = document.getElementById("apiKeyInput");
+          if (!apiKey.value.trim()) {
+            alert("Please enter your Real-Debrid API Key before proceeding.");
+            apiKey.focus();
+            return;
+          }
+
+          fetch("https://api.real-debrid.com/rest/1.0/user", {
+            method: "GET",
+            headers: {
+              Authorization: "Bearer " + apiKey.value.trim(),
+              "Access-Control-Allow-Origin": "*",
+              Accept: "application/json",
+            },
+          })
+            .then((response) => {
+              if (response.status === 401) {
+                alert("Invalid API Key.");
+                apiKey.focus();
+                return;
+              } else if (response.status !== 200) {
+                alert("Error fetching real-debrid. Try again later.");
+                return;
+              } else if (response.status === 200) {
+                window.location.href = "{{STREMIO_INSTALL_URL}}";
+                return;
+              }
+            })
+            .catch((error) => {
+              alert("Error fetching real-debrid. Try again later.");
+              return;
+            });
+          return;*/
+        });
+    </script>
+    <!-- <p style="margin-top: 40px; font-size: 14px; color: #aaa">
+      Manifest URL: <br />{{MANIFEST_URL}}
+    </p> -->
+  </body>
+</html>

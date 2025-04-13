@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Configure Carbone Addon</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        padding: 50px;
+        background-color: #1e1e1e;
+        color: white;
+      }
+      .btn {
+        padding: 12px 24px;
+        background-color: #9147ff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 18px;
+        text-decoration: none;
+        margin-top: 20px;
+        display: inline-block;
+      }
+      .btn:hover {
+        background-color: #7e30ff;
+      }
+      #apiKeyInput {
+        padding: 10px;
+        width: 80%;
+        max-width: 250px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        vertical-align: middle;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔧 Configure Carbone Addon</h1>
+    <p>
+      Enter your <strong>Real-Debrid API Key</strong> to connect your account to the addon.
+    </p>
+    <p>
+      <input type="text" id="apiKeyInput" placeholder="Enter API Key" />
+      <a
+        href="https://real-debrid.com/apitoken"
+        target="_blank"
+        style="margin-left: 5px; font-size: xx-small; color: #9147ff"
+        >Get it here</a
+      >
+    </p>
+    <button class="btn" id="saveButton">Save & Continue</button>
+
+    <script>
+      document.getElementById("saveButton").addEventListener("click", function () {
+        const apiKey = document.getElementById("apiKeyInput").value.trim();
+        if (!apiKey) {
+          alert("Please enter your Real-Debrid API Key.");
+          return;
+        }
+
+        fetch("https://api.real-debrid.com/rest/1.0/user", {
+          method: "GET",
+          headers: {
+            Authorization: "Bearer " + apiKey,
+            Accept: "application/json",
+          },
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("Auth failed");
+            return res.json();
+          })
+          .then((data) => {
+            alert("Welcome " + data.username + "! Your API key is valid.");
+            // optionally redirect to install the addon
+            // window.location.href = "{{STREMIO_INSTALL_URL}}";
+          })
+          .catch(() => {
+            alert("Invalid API key or failed to connect to Real-Debrid.");
+          });
+      });
+    </script>
+  </body>
+</html>
