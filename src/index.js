@@ -124,7 +124,8 @@ async function getRealDebridStreams(id, rdApiKey) {
 
     if (!downloads?.length) return [];
 
-    // Process in batches with early termination
+    const seenFilenames = new Set();
+
     const batchSize = 10;
     let filesProcessed = 0;
     let filesMatched = 0;
@@ -137,6 +138,14 @@ async function getRealDebridStreams(id, rdApiKey) {
       const batchResults = await Promise.all(
         batch.map(async (file) => {
           try {
+            if (seenFilenames.has(file.filename)) {
+              if (dev) console.log("Skipping duplicated:", file.filename);
+              perfTracker.record("duplicates", 0, { count: 1 });
+              return null;
+            }
+
+            seenFilenames.add(file.filename);
+
             const parseTimer = perfTracker.startTimer();
             const parsed = await parseFilename(file.filename);
             perfTracker.record("parse", parseTimer.end());
@@ -155,11 +164,22 @@ async function getRealDebridStreams(id, rdApiKey) {
               cached: malCache[`${parsed.title}-${parsed.season}`] ? 1 : 0,
             });
 
+            if (dev)
+              console.log(
+                "Comparing: ",
+                fileMalId,
+                malId + " AND ",
+                episode,
+                parsed.episode
+              );
+
             if (fileMalId != malId) return null;
 
             filesMatched++;
             return {
-              title: parsed.filename || `${parsed.title} Ep${parsed.episode}`,
+              title:
+                `${parsed.filename}\n  ${parsed.subtitle_language}` ||
+                `${parsed.title} Ep${parsed.episode}\n  ${parsed.subtitle_language}`,
               url: file.url,
             };
           } catch (err) {
@@ -216,10 +236,13 @@ builder.defineStreamHandler(async ({ id, config }) => {
 
   const cached = userRequestCache.get(`${id}:${config.rd_api_key}`);
   if (cached) {
-    return { streams: [cached] };
+    if (dev) console.log("Cache hit for", id, cached.streams);
+    return { streams: [cached.streams] };
   }
 
   const streams = await getRealDebridStreams(id, config.rd_api_key);
+
+  if (dev) console.log("Streams found:", streams);
 
   return { streams };
 });
@@ -249,6 +272,7 @@ async function preloadPopularContent(rdApiKey) {
             {
               url: item.url,
               title: parsed.filename,
+              subtitle_language: parsed.subtitle_language || "",
             },
             60 * 60 * 1000
           ); // Cache for 1 hour

@@ -31,13 +31,23 @@ const PATTERN_VALIDATORS = {
   english: (match, filename) =>
     match && match[1] && filename.includes(`Ep${match[1]}`),
 
-  spanish: (match, filename) =>
-    match &&
-    match[1] &&
-    filename.toLowerCase().includes(`capitulo ${match[1]}`),
+  spanish: (match, filename) => {
+    // First check if there's a number in parentheses
+    const parenMatch = filename.match(/\((\d+)\)/);
+    if (parenMatch) return true; // Prefer parenthesized numbers
+
+    // Fall back to capitulo number if no parentheses
+    return (
+      match &&
+      match[1] &&
+      filename.toLowerCase().includes(`capitulo ${match[1]}`)
+    );
+  },
 
   anime: (match, filename) =>
     match && match[1] && filename.includes(` - ${match[1]}`),
+
+  parentheses: (match) => match && match[1],
 };
 
 function extractEpisode(episodes) {
@@ -54,6 +64,7 @@ function fastGuess(filename) {
     { type: "anime", regex: COMMON_PATTERNS.anime },
     { type: "spanish", regex: COMMON_PATTERNS.spanish },
     { type: "english", regex: COMMON_PATTERNS.episode },
+    { type: "parentheses", regex: /\((\d+)\)/ },
   ];
 
   for (const { type, regex } of attempts) {

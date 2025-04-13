@@ -2,3 +2,5 @@
 episodeMap.json
 /node_modules
 data/*
+malIdCache.json
+RDCache.json
