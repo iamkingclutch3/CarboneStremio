@@ -201,10 +201,14 @@ async function getRealDebridStreams(id, rdApiKey) {
     }
 
     // Update cache
-    userRequestCache.set(cacheKey, {
-      streams,
-      expires: Date.now() + 5 * 60 * 1000, // 5 min cache
-    });
+    userRequestCache.set(
+      cacheKey,
+      {
+        streams,
+        expires: Date.now() + 60 * 60 * 1000, // 60 min cache
+      },
+      60 * 60 * 1000
+    );
     debouncedSaveCache();
 
     perfTracker.record("matching", 0, {
@@ -236,9 +240,8 @@ builder.defineStreamHandler(async ({ id, config }) => {
 
   const cached = userRequestCache.get(`${id}:${config.rd_api_key}`);
   if (cached) {
-    const cachedStreams = cached.streams;
-    if (dev > 0) console.log("Cache hit for", id, cachedStreams);
-    return { cachedStreams };
+    if (dev > 0) console.log("Cache hit for", id, cached.streams);
+    return { streams: cached.streams };
   }
 
   const streams = await getRealDebridStreams(id, config.rd_api_key);
@@ -261,19 +264,23 @@ async function preloadPopularContent(rdApiKey) {
     for (const item of recentItems) {
       try {
         const parsed = await parseFilename(item.filename);
-        if (!parsed?.title) continue;
+        if (!parsed?.title || !parsed?.episode) continue;
 
         const malId = await getMalId(parsed.title.trim(), parsed.season || 1);
         if (!malId) continue;
 
-        const cacheKey = `kitsu:${malId}:${parsed.episode || 1}`;
+        const cacheKey = `kitsu:${malId}:${parsed.episode}:${rdApiKey}`;
         if (!userRequestCache.get(cacheKey)) {
+          const stream = {
+            title: `${parsed.filename}\n  ${parsed.subtitle_language}`,
+            url: item.url,
+          };
+
           userRequestCache.set(
             cacheKey,
             {
-              url: item.url,
-              title: parsed.filename,
-              subtitle_language: parsed.subtitle_language || "",
+              streams: [stream],
+              expires: Date.now() + 60 * 60 * 1000,
             },
             60 * 60 * 1000
           ); // Cache for 1 hour
