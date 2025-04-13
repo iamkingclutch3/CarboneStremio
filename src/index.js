@@ -236,8 +236,9 @@ builder.defineStreamHandler(async ({ id, config }) => {
 
   const cached = userRequestCache.get(`${id}:${config.rd_api_key}`);
   if (cached) {
-    if (dev > 0) console.log("Cache hit for", id, cached.streams);
-    return { streams: [cached.streams] };
+    const cachedStreams = cached.streams;
+    if (dev > 0) console.log("Cache hit for", id, cachedStreams);
+    return { cachedStreams };
   }
 
   const streams = await getRealDebridStreams(id, config.rd_api_key);
