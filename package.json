@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "exports": "./server.js",
   "scripts": {
+    "start": "node src/server.js",
     "dev": "nodemon src/server.js --ignore data/*"
   },
   "keywords": [],
