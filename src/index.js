@@ -7,12 +7,12 @@ import { userRequestCache } from "./services/cacheManager.js";
 import fs from "fs";
 import path from "path";
 
-const dev = process.env.DEV == "1" ? true : false;
+const dev = Number.parseInt(process.env.DEV) > "0" ? true : false;
 
 const manifest = {
   id: "io.github.kingclutch23.carbone",
   version: "0.0.3",
-  name: dev ? "Carbone Dev" : "Carbone",
+  name: dev > 1 ? "Carbone Dev" : "Carbone",
   description: "Streams your RD-downloaded episodes",
   resources: ["stream"],
   types: ["movie", "series", "anime"],
@@ -139,7 +139,7 @@ async function getRealDebridStreams(id, rdApiKey) {
         batch.map(async (file) => {
           try {
             if (seenFilenames.has(file.filename)) {
-              if (dev) console.log("Skipping duplicated:", file.filename);
+              if (dev > 0) console.log("Skipping duplicated:", file.filename);
               perfTracker.record("duplicates", 0, { count: 1 });
               return null;
             }
@@ -164,7 +164,7 @@ async function getRealDebridStreams(id, rdApiKey) {
               cached: malCache[`${parsed.title}-${parsed.season}`] ? 1 : 0,
             });
 
-            if (dev)
+            if (dev > 0)
               console.log(
                 "Comparing: ",
                 fileMalId,
@@ -236,13 +236,13 @@ builder.defineStreamHandler(async ({ id, config }) => {
 
   const cached = userRequestCache.get(`${id}:${config.rd_api_key}`);
   if (cached) {
-    if (dev) console.log("Cache hit for", id, cached.streams);
+    if (dev > 0) console.log("Cache hit for", id, cached.streams);
     return { streams: [cached.streams] };
   }
 
   const streams = await getRealDebridStreams(id, config.rd_api_key);
 
-  if (dev) console.log("Streams found:", streams);
+  if (dev > 0) console.log("Streams found:", streams);
 
   return { streams };
 });
