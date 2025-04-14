@@ -70,7 +70,8 @@ async function getMalId(title, season) {
   const malId = await searchKitsuId(title, season);
   if (malId) {
     malCache[cacheKey] = malId;
-    console.log(`Cached MAL ID for "${title}" S${season}: ${malId}`);
+    if (dev > 0)
+      console.log(`Cached MAL ID for "${title}" S${season}: ${malId}`);
   }
 
   return malId || null;
@@ -253,21 +254,36 @@ builder.defineStreamHandler(async ({ id, config }) => {
 
 async function preloadPopularContent(rdApiKey) {
   try {
-    console.log("Starting background caching...");
+    if (dev > 0)  console.log("Starting background caching...");
     const downloads = await getDownloads(rdApiKey);
+    if (dev > 0)  console.log(`Found ${downloads?.length || 0} downloads`); // Add this line
 
     // Process most recent 50 items
     const recentItems = downloads
       .sort((a, b) => new Date(b.added) - new Date(a.added))
       .slice(0, 50);
+    if (dev > 0)  console.log(`Processing ${recentItems.length} recent items`); // Add this line
+
+    let processedCount = 0;
+    let cachedCount = 0;
 
     for (const item of recentItems) {
       try {
+        processedCount++;
+         if (dev > 0)
+           console.log(`Processing item ${processedCount}: ${item.filename}`); // Add this line
+
         const parsed = await parseFilename(item.filename);
-        if (!parsed?.title || !parsed?.episode) continue;
+        if (!parsed?.title || !parsed?.episode) {
+          if (dev > 0)  console.log("Skipping - missing title or episode");
+          continue;
+        }
 
         const malId = await getMalId(parsed.title.trim(), parsed.season || 1);
-        if (!malId) continue;
+        if (!malId) {
+          if (dev > 0)  console.log("Skipping - no MAL ID found");
+          continue;
+        }
 
         const cacheKey = `kitsu:${malId}:${parsed.episode}:${rdApiKey}`;
         if (!userRequestCache.get(cacheKey)) {
@@ -283,13 +299,20 @@ async function preloadPopularContent(rdApiKey) {
               expires: Date.now() + 60 * 60 * 1000,
             },
             60 * 60 * 1000
-          ); // Cache for 1 hour
+          );
+          cachedCount++;
+          if(dev > 0) console.log(`Cached ${cacheKey}`);
+        } else {
+          if (dev > 0) console.log("Already cached - skipping");
         }
       } catch (err) {
         console.error("Preload error for", item.filename, err);
       }
     }
-    console.log(`Pre-cached ${recentItems.length} items`);
+    if (dev > 0)
+       console.log(
+        `Pre-cached ${cachedCount} new items (processed ${processedCount})`
+      );
   } catch (err) {
     console.error("Background caching failed:", err);
   }
@@ -302,8 +325,16 @@ builder.defineCatalogHandler(async (args) => {
     return { metas: [], cacheMaxAge: 60 };
   }
 
-  // Start background caching
-  preloadPopularContent(config.rd_api_key);
+  try {
+    // Start background caching but don't await it
+    preloadPopularContent(config.rd_api_key)
+      .then(() => {
+        if (dev > 0) console.log("Background caching completed");
+      })
+      .catch((err) => console.error("Background caching failed:", err));
+  } catch (err) {
+    console.error("Error starting background caching:", err);
+  }
 
   // Return empty catalog (this is just for triggering cache)
   return {
