@@ -4,6 +4,7 @@ import { getDownloads } from "./clients/realDebridClient.js";
 import { searchKitsuId } from "./services/malSearchService.js";
 import { perfTracker } from "./services/performanceTracker.js";
 import { userRequestCache } from "./services/cacheManager.js";
+import { Queue } from "async";
 import fs from "fs";
 import path from "path";
 
@@ -50,6 +51,20 @@ const builder = addonBuilder(manifest);
 const malCache = {};
 const MAL_CACHE_FILE = path.join(process.cwd(), ".", "data", "malIdCache.json");
 
+const precacheQueue = new Queue(async (task, callback) => {
+  const { nextEp, malId, rdApiKey, downloads } = task;
+  try {
+    if (dev > 0) console.log(`Processing queue item: episode ${nextEp}`);
+    await precacheEpisode(nextEp, malId, rdApiKey, downloads);
+  } catch (err) {
+    if (dev > 0) console.error(`Queue task failed for episode ${nextEp}:`, err);
+  } finally {
+    callback();
+  }
+}, 2); // Process 2 episodes at a time
+
+const primingCache = new Set(); // For cache stampede protection
+
 if (fs.existsSync(MAL_CACHE_FILE)) {
   Object.assign(malCache, JSON.parse(fs.readFileSync(MAL_CACHE_FILE)));
 }
@@ -57,6 +72,60 @@ if (fs.existsSync(MAL_CACHE_FILE)) {
 setInterval(() => {
   fs.writeFileSync(MAL_CACHE_FILE, JSON.stringify(malCache));
 }, 15 * 60 * 1000); // 15 minutes
+
+async function precacheEpisode(nextEp, malId, rdApiKey, downloads) {
+  const nextCacheKey = `kitsu:${malId}:${nextEp}:${rdApiKey}`;
+
+  // Cache stampede protection
+  if (primingCache.has(nextCacheKey)) {
+    if (dev > 0) console.log(`Already priming cache for ${nextCacheKey}`);
+    return;
+  }
+
+  try {
+    primingCache.add(nextCacheKey);
+
+    if (userRequestCache.get(nextCacheKey)) {
+      if (dev > 0) console.log(`Already cached: ${nextCacheKey}`);
+      return;
+    }
+
+    if (dev > 0) console.log(`Pre-caching episode ${nextEp}`);
+
+    const nextEpFiles = downloads.filter((file) => {
+      try {
+        const parsed = parseFilename(file.filename);
+        return parsed?.episode === nextEp && fileMalId === malId;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (nextEpFiles.length > 0) {
+      const nextStreams = await Promise.all(
+        nextEpFiles.map(async (file) => {
+          const parsed = await parseFilename(file.filename);
+          return {
+            title: `${file.filename}\n  ${parsed?.subtitle_language || ""}`,
+            url: file.url,
+          };
+        })
+      );
+
+      userRequestCache.set(
+        nextCacheKey,
+        {
+          streams: nextStreams,
+          expires: Date.now() + 60 * 60 * 1000,
+        },
+        60 * 60 * 1000
+      );
+      if (dev > 0) console.log(`Successfully cached ${nextCacheKey}`);
+    }
+  } finally {
+    primingCache.delete(nextCacheKey);
+  }
+}
 
 async function getMalId(title, season) {
   const cacheKey = `${title}-${season}`;
@@ -116,6 +185,7 @@ async function getRealDebridStreams(id, rdApiKey) {
 
     // Extract info from ID (e.g., "kitsu:8203:2" -> malId=8203, episode=2)
     const [prefix, malId, episode] = id.split(":");
+    const currentEpisode = parseInt(episode);
 
     const rdApiTimer = perfTracker.startTimer();
     const downloads = await getDownloads(rdApiKey);
@@ -126,7 +196,6 @@ async function getRealDebridStreams(id, rdApiKey) {
     if (!downloads?.length) return [];
 
     const seenFilenames = new Set();
-
     const batchSize = 10;
     let filesProcessed = 0;
     let filesMatched = 0;
@@ -153,7 +222,7 @@ async function getRealDebridStreams(id, rdApiKey) {
             if (!parsed?.episode) return null;
 
             // Skip if episode doesn't match
-            if (parsed.episode != episode) return null;
+            if (parsed.episode != currentEpisode) return null;
 
             // Check MAL ID (cached)
             const malTimer = perfTracker.startTimer();
@@ -170,7 +239,7 @@ async function getRealDebridStreams(id, rdApiKey) {
                 "Comparing: ",
                 fileMalId,
                 malId + " AND ",
-                episode,
+                currentEpisode,
                 parsed.episode
               );
 
@@ -211,6 +280,32 @@ async function getRealDebridStreams(id, rdApiKey) {
       60 * 60 * 1000
     );
     debouncedSaveCache();
+
+    // Pre-cache next 3 episodes if we found current episode
+    if (streams.length > 0) {
+      precacheQueue.concurrency = systemLoad > 0.7 ? 1 : 2;
+      const nextEpisodes = [
+        currentEpisode + 1,
+        currentEpisode + 2,
+        currentEpisode + 3,
+      ];
+
+      nextEpisodes.forEach((nextEp) => {
+        precacheQueue.push({
+          nextEp,
+          malId,
+          rdApiKey,
+          downloads,
+        });
+      });
+
+      if (dev > 0) {
+        console.log(
+          `Added episodes ${nextEpisodes.join(", ")} to pre-cache queue`
+        );
+        console.log(`Queue status: ${precacheQueue.length()} pending tasks`);
+      }
+    }
 
     perfTracker.record("matching", 0, {
       filesProcessed,
@@ -254,15 +349,15 @@ builder.defineStreamHandler(async ({ id, config }) => {
 
 async function preloadPopularContent(rdApiKey) {
   try {
-    if (dev > 0)  console.log("Starting background caching...");
+    if (dev > 0) console.log("Starting background caching...");
     const downloads = await getDownloads(rdApiKey);
-    if (dev > 0)  console.log(`Found ${downloads?.length || 0} downloads`); // Add this line
+    if (dev > 0) console.log(`Found ${downloads?.length || 0} downloads`); // Add this line
 
     // Process most recent 50 items
     const recentItems = downloads
       .sort((a, b) => new Date(b.added) - new Date(a.added))
       .slice(0, 50);
-    if (dev > 0)  console.log(`Processing ${recentItems.length} recent items`); // Add this line
+    if (dev > 0) console.log(`Processing ${recentItems.length} recent items`); // Add this line
 
     let processedCount = 0;
     let cachedCount = 0;
@@ -270,18 +365,18 @@ async function preloadPopularContent(rdApiKey) {
     for (const item of recentItems) {
       try {
         processedCount++;
-         if (dev > 0)
-           console.log(`Processing item ${processedCount}: ${item.filename}`); // Add this line
+        if (dev > 0)
+          console.log(`Processing item ${processedCount}: ${item.filename}`); // Add this line
 
         const parsed = await parseFilename(item.filename);
         if (!parsed?.title || !parsed?.episode) {
-          if (dev > 0)  console.log("Skipping - missing title or episode");
+          if (dev > 0) console.log("Skipping - missing title or episode");
           continue;
         }
 
         const malId = await getMalId(parsed.title.trim(), parsed.season || 1);
         if (!malId) {
-          if (dev > 0)  console.log("Skipping - no MAL ID found");
+          if (dev > 0) console.log("Skipping - no MAL ID found");
           continue;
         }
 
@@ -301,7 +396,7 @@ async function preloadPopularContent(rdApiKey) {
             60 * 60 * 1000
           );
           cachedCount++;
-          if(dev > 0) console.log(`Cached ${cacheKey}`);
+          if (dev > 0) console.log(`Cached ${cacheKey}`);
         } else {
           if (dev > 0) console.log("Already cached - skipping");
         }
@@ -310,7 +405,7 @@ async function preloadPopularContent(rdApiKey) {
       }
     }
     if (dev > 0)
-       console.log(
+      console.log(
         `Pre-cached ${cachedCount} new items (processed ${processedCount})`
       );
   } catch (err) {
@@ -318,8 +413,13 @@ async function preloadPopularContent(rdApiKey) {
   }
 }
 
+let isPrecaching = false;
+
 builder.defineCatalogHandler(async (args) => {
   const { config, extra } = args;
+
+  if (isPrecaching) return;
+  isPrecaching = true;
 
   if (!config?.rd_api_key) {
     return { metas: [], cacheMaxAge: 60 };
@@ -334,6 +434,8 @@ builder.defineCatalogHandler(async (args) => {
       .catch((err) => console.error("Background caching failed:", err));
   } catch (err) {
     console.error("Error starting background caching:", err);
+  } finally {
+    isPrecaching = false;
   }
 
   // Return empty catalog (this is just for triggering cache)
