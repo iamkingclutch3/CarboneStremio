@@ -275,6 +275,7 @@ async function getRealDebridStreams(id, rdApiKey) {
     );
     debouncedSaveCache();
 
+    /*
     // Pre-cache next 3 episodes if we found current episode
     if (streams.length > 0) {
       precacheQueue.concurrency = systemLoad > 0.7 ? 1 : 2;
@@ -299,7 +300,7 @@ async function getRealDebridStreams(id, rdApiKey) {
         );
         console.log(`Queue status: ${precacheQueue.length()} pending tasks`);
       }
-    }
+    }*/
 
     perfTracker.record("matching", 0, {
       filesProcessed,
