@@ -4,7 +4,7 @@ import { getDownloads } from "./services/realDebridClient.js";
 import { searchKitsuId } from "./services/malSearchService.js";
 import { perfTracker } from "./clients/performanceTracker.js";
 import { userRequestCache } from "./services/cacheManager.js";
-import AsyncQueue from "./clients/asyncQueue.js";
+import AsyncQueue from "./clients/AsyncQueue.js";
 import fs from "fs";
 import path from "path";
 
