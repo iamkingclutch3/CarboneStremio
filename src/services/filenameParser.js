@@ -1,5 +1,6 @@
 import { RateLimiter } from "limiter";
 import { LRUCache } from "lru-cache";
+import { getKitsuSeasons } from "../services/malSearchService.js";
 import fetch from "node-fetch";
 
 // More efficient cache with TTL
@@ -85,6 +86,11 @@ function fastGuess(filename) {
   return null;
 }
 
+function extractYear(filename) {
+  const match = filename.match(/\((19|20)\d{2}\)/);
+  return match ? parseInt(match[0].slice(1, 5)) : null;
+}
+
 async function parseFilename(filename) {
   // 1. Check cache first
   if (cache.has(filename)) {
@@ -93,7 +99,17 @@ async function parseFilename(filename) {
 
   // 2. Try fast local parsing
   const quickResult = fastGuess(filename);
+  const year = null //extractYear(filename);
+  /* console.log("Search for", filename, await getKitsuSeasons(quickResult.title))
+  const seasonByYear =
+    (await getKitsuSeasons(quickResult.title)).findIndex((season) =>
+      season.title.includes(year)
+    ) + 1;*/
+
   if (quickResult) {
+    year
+      ? (quickResult.season = seasonByYear)
+      : (quickResult.season = quickResult.season);
     cache.set(filename, quickResult);
     //if (Number.parseInt(process.env.DEV) > 0) console.log("Quick guess:", quickResult);
     return quickResult;
@@ -128,7 +144,7 @@ async function parseFilename(filename) {
       title: data.title || null,
       filename,
       episode: extractEpisode(data.episode),
-      season: data.season || 1,
+      season: year ? seasonByYear : data.season || 1,
       subtitle_language: data.subtitle_language || "",
     };
 
