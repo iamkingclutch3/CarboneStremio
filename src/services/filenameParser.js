@@ -95,6 +95,7 @@ async function parseFilename(filename) {
   const quickResult = fastGuess(filename);
   if (quickResult) {
     cache.set(filename, quickResult);
+    //if (Number.parseInt(process.env.DEV) > 0) console.log("Quick guess:", quickResult);
     return quickResult;
   }
 

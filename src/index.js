@@ -275,32 +275,7 @@ async function getRealDebridStreams(id, rdApiKey) {
     );
     debouncedSaveCache();
 
-    /*
-    // Pre-cache next 3 episodes if we found current episode
-    if (streams.length > 0) {
-      precacheQueue.concurrency = systemLoad > 0.7 ? 1 : 2;
-      const nextEpisodes = [
-        currentEpisode + 1,
-        currentEpisode + 2,
-        currentEpisode + 3,
-      ];
-
-      nextEpisodes.forEach((nextEp) => {
-        precacheQueue.push({
-          nextEp,
-          malId,
-          rdApiKey,
-          downloads,
-        });
-      });
-
-      if (dev > 0) {
-        console.log(
-          `Added episodes ${nextEpisodes.join(", ")} to pre-cache queue`
-        );
-        console.log(`Queue status: ${precacheQueue.length()} pending tasks`);
-      }
-    }*/
+    startNextCache(streams, currentEpisode, malId, rdApiKey, downloads, 2);
 
     perfTracker.record("matching", 0, {
       filesProcessed,
@@ -319,6 +294,33 @@ async function getRealDebridStreams(id, rdApiKey) {
     perfTracker.record("request", timer.end(), {
       streamsFound: streams?.length || 0,
     });
+  }
+}
+
+function startNextCache(streams, currentEpisode, malId, rdApiKey, downloads, nExtraChapters = 3) {
+  if (streams.length > 0) {
+    const nextEpisodes = Array.from(
+      { length: nExtraChapters },
+      (_, i) => currentEpisode + i + 1
+    );
+
+    nextEpisodes.forEach((nextEp) => {
+      precacheQueue.push({
+        nextEp,
+        malId,
+        rdApiKey,
+        downloads,
+      });
+    });
+
+    if (dev > 0) {
+      console.log(
+        `Added episodes ${nextEpisodes.join(", ")} to pre-cache queue`
+      );
+      console.log(`Queue status: ${precacheQueue.length()} pending tasks`);
+    }
+  } else {
+    return;
   }
 }
 
