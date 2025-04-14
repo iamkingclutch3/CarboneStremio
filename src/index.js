@@ -1,10 +1,10 @@
 import { addonBuilder } from "stremio-addon-sdk";
 import { parseFilename } from "./services/filenameParser.js";
-import { getDownloads } from "./clients/realDebridClient.js";
+import { getDownloads } from "./services/realDebridClient.js";
 import { searchKitsuId } from "./services/malSearchService.js";
-import { perfTracker } from "./services/performanceTracker.js";
+import { perfTracker } from "./clients/performanceTracker.js";
 import { userRequestCache } from "./services/cacheManager.js";
-import { Queue } from "async";
+import AsyncQueue from "./clients/asyncQueue.js";
 import fs from "fs";
 import path from "path";
 
@@ -51,16 +51,10 @@ const builder = addonBuilder(manifest);
 const malCache = {};
 const MAL_CACHE_FILE = path.join(process.cwd(), ".", "data", "malIdCache.json");
 
-const precacheQueue = new Queue(async (task, callback) => {
+const precacheQueue = new AsyncQueue(async (task) => {
   const { nextEp, malId, rdApiKey, downloads } = task;
-  try {
-    if (dev > 0) console.log(`Processing queue item: episode ${nextEp}`);
-    await precacheEpisode(nextEp, malId, rdApiKey, downloads);
-  } catch (err) {
-    if (dev > 0) console.error(`Queue task failed for episode ${nextEp}:`, err);
-  } finally {
-    callback();
-  }
+  if (dev > 0) console.log(`Processing queue item: episode ${nextEp}`);
+  await precacheEpisode(nextEp, malId, rdApiKey, downloads);
 }, 2); // Process 2 episodes at a time
 
 const primingCache = new Set(); // For cache stampede protection

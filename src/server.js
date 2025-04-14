@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import stremioAddonSDK from "stremio-addon-sdk";
 import builder from "./index.js";
-import { perfTracker } from "./services/performanceTracker.js";
+import { perfTracker } from "./clients/performanceTracker.js";
 import fs from "fs";
 import path from "path";
 
